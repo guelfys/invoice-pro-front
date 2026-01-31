@@ -8,7 +8,7 @@
         <h2 class="modalTitle">Seleccionar CUIT</h2>
         <p class="modalSubtitle">
           Elegí el CUIT con el que se va a facturar en esta ejecución.
-          <span v-if="MULTI_ENV_ENABLED" class="envBadge" :class="env === 'demo' ? 'demo' : 'prod'">
+          <span class="envBadge" :class="env === 'demo' ? 'demo' : 'prod'">
             {{ env === 'demo' ? 'DEMO' : 'PRODUCCIÓN' }}
           </span>
         </p>
@@ -19,13 +19,50 @@
             {{ u.cuit }}<span v-if="u.razon_social"> - {{ u.razon_social }}</span>
           </option>
         </select>
+        <div class="uploadBlock">
+          <div class="uploadTitle">Archivos de facturación (opcional)</div>
+
+          <div class="uploadRow">
+            <div class="uploadLabel">Factura A</div>
+            <div class="uploadCtrl">
+              <input class="uploadInput" type="file" accept=".xlsx" @change="onPickFile('A', $event)" />
+              <button v-if="fileA" class="linkBtn" type="button" @click="clearPicked('A')">Quitar</button>
+            </div>
+            <div v-if="fileA" class="uploadName">{{ fileA.name }}</div>
+          </div>
+
+          <div class="uploadRow">
+            <div class="uploadLabel">Factura B</div>
+            <div class="uploadCtrl">
+              <input class="uploadInput" type="file" accept=".xlsx" @change="onPickFile('B', $event)" />
+              <button v-if="fileB" class="linkBtn" type="button" @click="clearPicked('B')">Quitar</button>
+            </div>
+            <div v-if="fileB" class="uploadName">{{ fileB.name }}</div>
+          </div>
+
+          <div class="uploadRow">
+            <div class="uploadLabel">Factura C</div>
+            <div class="uploadCtrl">
+              <input class="uploadInput" type="file" accept=".xlsx" @change="onPickFile('C', $event)" />
+              <button v-if="fileC" class="linkBtn" type="button" @click="clearPicked('C')">Quitar</button>
+            </div>
+            <div v-if="fileC" class="uploadName">{{ fileC.name }}</div>
+          </div>
+
+          <label class="chk">
+            <input type="checkbox" v-model="clearOtherFacturacion" />
+            Limpiar Facturacion.xlsx de los otros tipos antes de guardar
+          </label>
+          <p class="uploadHint">Se guardan en input/Factura A|B|C como Facturacion.xlsx.</p>
+        </div>
+
 
         <p v-if="modalError" class="modalError">{{ modalError }}</p>
 
         <div class="modalActions">
           <button class="secondary" @click="goBack">Cancelar</button>
-          <button class="primary" :disabled="!selectedCuit || busy" @click="confirmCuitAndStart">
-            Iniciar
+          <button class="primary" :disabled="!selectedCuit || busy || confirming" @click="confirmCuitAndStart">
+            {{ startBtnText }}
           </button>
         </div>
       </div>
@@ -39,7 +76,7 @@
           </button>
           <h1>Generar comprobantes</h1>
 
-          <span v-if="MULTI_ENV_ENABLED" class="envPill" :class="env === 'demo' ? 'demo' : 'prod'">
+          <span class="envPill" :class="env === 'demo' ? 'demo' : 'prod'">
             {{ env === 'demo' ? 'DEMO' : 'PRODUCCIÓN' }}
           </span>
         </div>
@@ -115,7 +152,6 @@ import { useRouter } from 'vue-router'
 import TopBar from '@/components/TopBar.vue'
 import { http } from '@/api/http'
 import { useRuntimeEnv } from '@/composables/useRuntimeEnv'
-import { MULTI_ENV_ENABLED, DEFAULT_ENV } from '@/config/runtimeEnv'
 
 type Phase = 'idle' | 'running' | 'done'
 type CodeDesc = { code: number; desc: string }
@@ -134,7 +170,6 @@ const router = useRouter()
 const icons = { union: new URL('@/assets/icons/Union.svg', import.meta.url).href }
 
 const { env } = useRuntimeEnv()
-const effectiveEnv = computed(() => (MULTI_ENV_ENABLED ? env.value : DEFAULT_ENV))
 
 const phase = ref<Phase>('idle')
 const busy = ref(false)
@@ -142,8 +177,8 @@ const busy = ref(false)
 const jobId = ref<string>('')
 const jobLog = ref<string>('')
 
-const currentPrint = ref<string>('')      
-const seenPrints = ref<number>(0)      
+const currentPrint = ref<string>('')       
+const seenPrints = ref<number>(0)           
 const percent = ref<number>(0)
 
 const printFeed = ref<string[]>([])
@@ -157,6 +192,19 @@ const cuitsList = ref<CuitItem[]>([])
 const selectedCuit = ref<number | null>(null)
 const chosenCuit = ref<number | null>(null)
 const modalError = ref('')
+// Upload Facturacion.xlsx (A/B/C)
+const confirming = ref(false)
+const fileA = ref<File | null>(null)
+const fileB = ref<File | null>(null)
+const fileC = ref<File | null>(null)
+const clearOtherFacturacion = ref(true)
+
+const hasAnyFile = computed(() => !!(fileA.value || fileB.value || fileC.value))
+const startBtnText = computed(() => {
+  if (confirming.value) return 'Preparando...'
+  return hasAnyFile.value ? 'Subir e iniciar' : 'Iniciar'
+})
+
 
 const progress = computed(() => {
   if (phase.value === 'done') return 100
@@ -232,14 +280,73 @@ async function loadCuitsForModal(){
   }
 }
 
+
+function isXlsx(file: File){
+  return file.name.toLowerCase().endsWith('.xlsx')
+}
+
+function onPickFile(tipo: 'A'|'B'|'C', ev: Event){
+  const input = ev.target as HTMLInputElement
+  const f = input.files?.[0] || null
+  if (!f) return
+
+  if (!isXlsx(f)) {
+    modalError.value = 'Por ahora solo se admite .xlsx (Facturacion.xlsx).'
+    input.value = ''
+    return
+  }
+
+  modalError.value = ''
+  if (tipo === 'A') fileA.value = f
+  if (tipo === 'B') fileB.value = f
+  if (tipo === 'C') fileC.value = f
+}
+
+function clearPicked(tipo: 'A'|'B'|'C'){
+  if (tipo === 'A') fileA.value = null
+  if (tipo === 'B') fileB.value = null
+  if (tipo === 'C') fileC.value = null
+}
+
+async function uploadFacturacion(cuit: number){
+  if (!hasAnyFile.value) return
+
+  const fd = new FormData()
+  fd.append('cuit', String(cuit))
+  fd.append('clear_others', String(clearOtherFacturacion.value))
+  if (fileA.value) fd.append('factura_a', fileA.value)
+  if (fileB.value) fd.append('factura_b', fileB.value)
+  if (fileC.value) fd.append('factura_c', fileC.value)
+
+  await http.post('/api/generar/facturacion/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+
 async function confirmCuitAndStart(){
   if (!selectedCuit.value) {
     modalError.value = 'Seleccioná un CUIT para iniciar.'
     return
   }
-  chosenCuit.value = selectedCuit.value
-  showCuitModal.value = false
-  await startJob(chosenCuit.value)
+
+  modalError.value = ''
+  confirming.value = true
+
+  try{
+    // 1) Subir archivos
+    await uploadFacturacion(selectedCuit.value)
+
+    // 2) Ejecutar job
+    chosenCuit.value = selectedCuit.value
+    showCuitModal.value = false
+    await startJob(chosenCuit.value)
+  }catch(e:any){
+    const msg = e?.response?.data?.detail || e?.message || 'Error al iniciar.'
+    modalError.value = String(msg)
+  }finally{
+    confirming.value = false
+  }
 }
 
 function isTechnicalLine(l: string){
@@ -285,12 +392,14 @@ function buildPrintFeed(raw: string): string[] {
       continue
     }
 
+    // JSON del cuerpo (muy largo)
     if (trimmed.includes('CUERPO DE SOLICITUD SEGÚN JSON')) { inReqJson = true; continue }
     if (inReqJson) {
       if (trimmed.includes('-----------------------------------------------------')) inReqJson = false
       continue
     }
 
+    // tabla pandas (muy larga)
     if (!inTable && looksLikeTableHeader(trimmed)) { inTable = true; continue }
     if (inTable) {
       if (trimmed.includes('rows x') && trimmed.includes('columns')) inTable = false
@@ -352,7 +461,7 @@ async function startJob(cuit: number){
     const { data } = await http.post('/jobs/generar', {
       mode: 'local',
       cuit,
-      environment: effectiveEnv.value,
+      environment: env.value, // 'demo' | 'prod'
     })
 
     jobId.value = data.id
@@ -660,6 +769,16 @@ h3{margin:0;font-size:34px;letter-spacing:-1px;color:var(--text)}
   border-radius:10px;
   padding:10px 12px;
 }
+
+.uploadBlock{margin-top:14px;padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff}
+.uploadTitle{font-weight:900;color:var(--text);font-size:13px;margin-bottom:10px}
+.uploadRow{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;margin-bottom:10px}
+.uploadLabel{font-size:12px;font-weight:800;color:var(--muted)}
+.uploadCtrl{display:flex;gap:10px;align-items:center}
+.uploadInput{flex:1;min-width:0}
+.uploadName{grid-column:2; font-size:12px;color:var(--text);opacity:.9}
+.uploadHint{margin:8px 0 0 0;font-size:12px;color:var(--muted)}
+.chk{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
 .modalActions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px}
 .modalError{margin-top:10px;color:#b42318;font-weight:600;font-size:12px}
 .primary{

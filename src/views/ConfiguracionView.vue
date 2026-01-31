@@ -39,7 +39,6 @@
         <div v-if="detail && selectedCuit" class="detailGrid">
           <div class="kv">
             <div class="k">Entorno</div>
-            <!-- backend devuelve 'produccion' -->
             <div class="v">{{ detail.environment === 'produccion' ? 'PRODUCCIÓN' : 'DEMO' }}</div>
           </div>
 
@@ -59,28 +58,49 @@
           </div>
 
           <div class="kv">
-            <div class="k">Puntos de venta</div>
+            <div class="k">Punto de venta (seleccionar 1)</div>
             <div class="v">
-              <span v-if="!detail.puntos_venta?.length">—</span>
-              <ul v-else>
-                <li v-for="pv in detail.puntos_venta" :key="pv.pto_vta">
-                  PV {{ pv.pto_vta }} <span v-if="pv.estado">({{ pv.estado }})</span>
-                </li>
-              </ul>
+              <span v-if="!pvOptions.length">—</span>
+
+              <div v-else class="inlineSelect">
+                <select v-model.number="selectedPuntoVenta" @change="syncExcel">
+                  <option v-for="pv in pvOptions" :key="pv.value" :value="pv.value">
+                    {{ pv.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="hintSmall" v-if="pvOptions.length">
+                Se guarda 1 solo PV en Config.xlsx
+              </div>
             </div>
           </div>
 
           <div class="kv">
-            <div class="k">Actividades</div>
+            <div class="k">Actividad (seleccionar 1)</div>
             <div class="v">
-              <span v-if="!detail.actividades?.length">—</span>
-              <ul v-else>
-                <li v-for="a in detail.actividades" :key="a.codigo">
-                  {{ a.codigo }} <span v-if="a.descripcion">- {{ a.descripcion }}</span>
-                </li>
-              </ul>
+              <span v-if="!actOptions.length">—</span>
+
+              <div v-else class="inlineSelect">
+                <select v-model.number="selectedActividad" @change="syncExcel">
+                  <option v-for="a in actOptions" :key="a.value" :value="a.value">
+                    {{ a.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="hintSmall" v-if="actOptions.length">
+                Se guarda 1 sola actividad en Config.xlsx
+              </div>
             </div>
           </div>
+        </div>
+
+        <div v-if="syncMsg" class="muted" style="margin-top: 10px;">
+          {{ syncMsg }}
+        </div>
+        <div v-if="syncErr" class="error" style="margin-top: 10px;">
+          {{ syncErr }}
         </div>
       </section>
     </main>
@@ -98,7 +118,6 @@
           <input v-model="mCuit" placeholder="307xxxxxxxx" />
         </div>
 
-        <!-- SOLO mostrar selector si está habilitado multi-ambiente -->
         <div class="formRow" v-if="MULTI_ENV_ENABLED">
           <label>Entorno *</label>
           <select v-model="mEnv">
@@ -153,6 +172,9 @@ import { http } from '@/api/http'
 import { MULTI_ENV_ENABLED, DEFAULT_ENV } from '@/config/runtimeEnv'
 
 type CuitItem = { cuit: number; razon_social: string }
+type PVOpt = { value: number; label: string }
+type ActOpt = { value: number; label: string }
+
 type Detail = {
   cuit: string
   environment: 'demo' | 'produccion'
@@ -161,6 +183,7 @@ type Detail = {
   condicion_iva?: string
   puntos_venta?: any[]
   actividades?: any[]
+  actividades_detalle?: any[] 
 }
 
 const router = useRouter()
@@ -182,7 +205,92 @@ const mCert = ref<File | null>(null)
 const mKey = ref<File | null>(null)
 const mError = ref('')
 
+const pvOptions = ref<PVOpt[]>([])
+const actOptions = ref<ActOpt[]>([])
+const selectedPuntoVenta = ref<number | null>(null)
+const selectedActividad = ref<number | null>(0)
+
+  
+const syncMsg = ref('')
+const syncErr = ref('')
+
 function goBack(){ router.push('/') }
+
+function toInt(v:any): number | null {
+  if (v === null || v === undefined) return null
+  const n = Number(String(v).trim())
+  return Number.isFinite(n) ? n : null
+}
+
+function buildPvOptions(arr:any[]): PVOpt[] {
+  if (!Array.isArray(arr)) return []
+  // Caso: [{pto_vta, estado}]
+  if (arr.length && typeof arr[0] === 'object' && arr[0] !== null) {
+    return arr
+      .map((x:any) => {
+        const v = toInt(x.pto_vta ?? x.punto_venta ?? x.nro ?? x.numero)
+        if (v === null) return null
+        const estado = x.estado ? ` (${x.estado})` : ''
+        return { value: v, label: `PV ${v}${estado}` }
+      })
+      .filter(Boolean) as PVOpt[]
+  }
+  // Caso: [60,61]
+  return arr
+    .map((x:any) => {
+      const v = toInt(x)
+      if (v === null) return null
+      return { value: v, label: `PV ${v}` }
+    })
+    .filter(Boolean) as PVOpt[]
+}
+
+function buildActOptions(det:any[] | null | undefined, arr:any[] | null | undefined): ActOpt[] {
+  const opts: ActOpt[] = []
+
+  // 0 siempre disponible
+  opts.push({ value: 0, label: '0 - (Sin informar)' })
+
+  const addUnique = (value: number, label: string) => {
+    if (!opts.some(o => o.value === value)) {
+      opts.push({ value, label })
+    }
+  }
+
+  // Preferimos detalle (id + descripción) si existe
+  if (Array.isArray(det) && det.length) {
+    for (const a of det) {
+      const v = toInt((a as any).id ?? (a as any).idActividad ?? (a as any).codigo ?? (a as any).numero_actividad ?? (a as any).value)
+      if (v === null || v === 0) continue
+      const desc = String((a as any).descripcion ?? (a as any).descripcionActividad ?? '').trim()
+      addUnique(v, desc ? `${v} - ${desc}` : String(v))
+    }
+    return opts
+  }
+
+  // Fallback: estructura anterior (objetos o ids)
+  const safeArr = Array.isArray(arr) ? arr : []
+
+  // Caso: [{codigo/id/numero_actividad, descripcion}]
+  if (safeArr.length && typeof safeArr[0] === 'object' && safeArr[0] !== null) {
+    for (const x of safeArr) {
+      const v = toInt((x as any).codigo ?? (x as any).id ?? (x as any).idActividad ?? (x as any).numero_actividad)
+      if (v === null || v === 0) continue
+      const desc = String((x as any).descripcion ?? (x as any).descripcionActividad ?? '').trim()
+      addUnique(v, desc ? `${v} - ${desc}` : String(v))
+    }
+    return opts
+  }
+
+  // Caso: [620100, 702092]
+  for (const x of safeArr) {
+    const v = toInt(x)
+    if (v === null || v === 0) continue
+    addUnique(v, String(v))
+  }
+
+  return opts
+}
 
 async function loadCuits(){
   errorMsg.value = ''
@@ -205,11 +313,31 @@ async function loadDetail(){
   if(!selectedCuit.value) return
   errorMsg.value = ''
   loading.value = true
+  syncMsg.value = ''
+  syncErr.value = ''
   try{
     const { data } = await http.get(`/api/config/cuits/${selectedCuit.value}`)
     detail.value = data as Detail
+
+    pvOptions.value = buildPvOptions(detail.value?.puntos_venta || [])
+    actOptions.value = buildActOptions((detail.value as any)?.actividades_detalle, detail.value?.actividades || [])
+
+    if (pvOptions.value.length) selectedPuntoVenta.value ??= pvOptions.value[0].value
+    if (actOptions.value.length) {
+      if (selectedActividad.value === null) selectedActividad.value = 0
+      if (!actOptions.value.some(o => o.value === selectedActividad.value)) selectedActividad.value = 0
+    }
+
+    if (selectedPuntoVenta.value !== null || selectedActividad.value !== null) {
+      await syncExcel()
+    }
+
   }catch(e:any){
     detail.value = null
+    pvOptions.value = []
+    actOptions.value = []
+    selectedPuntoVenta.value = null
+    selectedActividad.value = null
     errorMsg.value = e?.response?.data?.detail || e?.message || 'No se pudo cargar el detalle del CUIT.'
   }finally{
     loading.value = false
@@ -278,6 +406,22 @@ async function submit(){
   }
 }
 
+async function syncExcel(){
+  if(!selectedCuit.value) return
+  syncMsg.value = ''
+  syncErr.value = ''
+  try{
+    await http.post(`/api/config/cuits/${selectedCuit.value}/sync-excel`, {
+      punto_venta: selectedPuntoVenta.value,
+      numero_actividad: selectedActividad.value,
+      force_pv_actividad: true
+    })
+    syncMsg.value = 'Configuración guardada en Config.xlsx (FacturaA/B/C).'
+  }catch(e:any){
+    syncErr.value = e?.response?.data?.detail || e?.message || 'No se pudo sincronizar Config.xlsx.'
+  }
+}
+
 async function refreshArca(){
   if(!selectedCuit.value) return
   errorMsg.value = ''
@@ -291,6 +435,7 @@ async function refreshArca(){
     loading.value = false
   }
 }
+
 
 onMounted(loadCuits)
 </script>
@@ -306,7 +451,7 @@ onMounted(loadCuits)
 .rowActions{ display:flex; gap:10px; flex-wrap:wrap; }
 .muted{ color:#666; margin:6px 0 0; }
 .formRow{ display:flex; flex-direction:column; gap:6px; margin-top:14px; }
-input, select{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; font-size:14px; }
+input, select{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; font-size:14px; width:100%; }
 .primary{ background:#111; color:#fff; border:none; padding:10px 14px; border-radius:12px; cursor:pointer; }
 .secondary{ background:#fff; color:#111; border:1px solid #ddd; padding:10px 14px; border-radius:12px; cursor:pointer; }
 .error{ color:#b00020; margin-top:10px; }
@@ -318,5 +463,7 @@ input, select{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; fon
 .modal{ width:min(640px, 100%); background:#fff; border-radius:18px; padding:18px; }
 .actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
 .hint{ font-size:12px; color:#666; margin-top:6px; }
+.hintSmall{ font-size:12px; color:#666; margin-top:8px; }
+.inlineSelect{ margin-top:6px; }
 code{ background:#f6f6f6; padding:2px 6px; border-radius:6px; }
 </style>

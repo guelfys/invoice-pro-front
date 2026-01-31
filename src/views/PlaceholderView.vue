@@ -4,7 +4,7 @@
     <main class="wrap">
       <div class="box">
         <h1>{{ title }}</h1>
-        <p>Vista placeholder. Acá vamos a ir armando la pantalla real y conectando con la API.</p>
+        <p>En proceso.</p>
         <router-link to="/" class="back">← Volver</router-link>
       </div>
     </main>
