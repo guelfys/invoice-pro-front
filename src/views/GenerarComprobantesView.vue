@@ -314,13 +314,11 @@ async function uploadFacturacion(cuit: number){
   const fd = new FormData()
   fd.append('cuit', String(cuit))
   fd.append('clear_others', String(clearOtherFacturacion.value))
-  if (fileA.value) fd.append('factura_a', fileA.value)
-  if (fileB.value) fd.append('factura_b', fileB.value)
-  if (fileC.value) fd.append('factura_c', fileC.value)
+  if (fileA.value) fd.append('fileA', fileA.value)
+  if (fileB.value) fd.append('fileB', fileB.value)
+  if (fileC.value) fd.append('fileC', fileC.value)
 
-  await http.post('/api/generar/facturacion/upload', fd, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  await http.post('/api/generar/facturacion/upload', fd)
 }
 
 

@@ -248,7 +248,6 @@ function buildPvOptions(arr:any[]): PVOpt[] {
 function buildActOptions(det:any[] | null | undefined, arr:any[] | null | undefined): ActOpt[] {
   const opts: ActOpt[] = []
 
-  // 0 siempre disponible
   opts.push({ value: 0, label: '0 - (Sin informar)' })
 
   const addUnique = (value: number, label: string) => {
@@ -257,7 +256,6 @@ function buildActOptions(det:any[] | null | undefined, arr:any[] | null | undefi
     }
   }
 
-  // Preferimos detalle (id + descripción) si existe
   if (Array.isArray(det) && det.length) {
     for (const a of det) {
       const v = toInt((a as any).id ?? (a as any).idActividad ?? (a as any).codigo ?? (a as any).numero_actividad ?? (a as any).value)
@@ -268,10 +266,8 @@ function buildActOptions(det:any[] | null | undefined, arr:any[] | null | undefi
     return opts
   }
 
-  // Fallback: estructura anterior (objetos o ids)
   const safeArr = Array.isArray(arr) ? arr : []
 
-  // Caso: [{codigo/id/numero_actividad, descripcion}]
   if (safeArr.length && typeof safeArr[0] === 'object' && safeArr[0] !== null) {
     for (const x of safeArr) {
       const v = toInt((x as any).codigo ?? (x as any).id ?? (x as any).idActividad ?? (x as any).numero_actividad)
@@ -282,7 +278,6 @@ function buildActOptions(det:any[] | null | undefined, arr:any[] | null | undefi
     return opts
   }
 
-  // Caso: [620100, 702092]
   for (const x of safeArr) {
     const v = toInt(x)
     if (v === null || v === 0) continue
