@@ -30,12 +30,14 @@
         </InfoBanner>
 
         <div class="cards">
+          <!--
           <ActionCard
             title="Añadir comprobantes"
             description="Sumá facturas, notas de crédito o débito al archivo Excel."
             :iconSrc="icons.filePlus"
             @click="goArmar"
           />
+          -->
           <ActionCard
             title="Generar comprobantes"
             description="Generá comprobantes electrónicos desde el archivo Excel."
