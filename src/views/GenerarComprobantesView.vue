@@ -4,71 +4,148 @@
 
     <!-- MODAL Selección CUIT -->
     <div v-if="showCuitModal" class="modalOverlay">
-      <div class="modalCard">
-        <h2 class="modalTitle">Seleccionar CUIT</h2>
-        <p class="modalSubtitle">
-          Elegí el CUIT con el que se va a facturar en esta ejecución.
-          <span class="envBadge" :class="env === 'demo' ? 'demo' : 'prod'">
-            {{ env === 'demo' ? 'DEMO' : 'PRODUCCIÓN' }}
-          </span>
-        </p>
-
-        <label class="modalLabel">CUIT</label>
-        <select class="modalSelect" v-model.number="selectedCuit">
-          <option v-for="u in cuitsList" :key="u.cuit" :value="u.cuit">
-            {{ u.cuit }}<span v-if="u.razon_social"> - {{ u.razon_social }}</span>
-          </option>
-        </select>
-        <div class="uploadBlock">
-          <div class="uploadTitle">Archivos de facturación (opcional)</div>
-
-          <div class="uploadRow">
-            <div class="uploadLabel">Factura A</div>
-            <div class="uploadCtrl">
-              <input class="uploadInput" type="file" accept=".xlsx" @change="onPickFile('A', $event)" />
-              <button v-if="fileA" class="linkBtn" type="button" @click="clearPicked('A')">Quitar</button>
+      <div class="modalShell" role="dialog" aria-modal="true">
+        <div class="modalHeader">
+          <div class="modalHeaderText">
+            <div class="modalTitleRow">
+              <div class="modalTitle">Seleccionar CUIT/CUIL</div>
+              <span class="envBadge" :class="env === 'demo' ? 'demo' : 'prod'">
+                {{ env === 'demo' ? 'DEMO' : 'PRODUCCIÓN' }}
+              </span>
             </div>
-            <div v-if="fileA" class="uploadName">{{ fileA.name }}</div>
+            <div class="modalSubtitle">Elegí el CUIT/CUIL con el que se va a facturar en esta ejecución.</div>
           </div>
 
-          <div class="uploadRow">
-            <div class="uploadLabel">Factura B</div>
-            <div class="uploadCtrl">
-              <input class="uploadInput" type="file" accept=".xlsx" @change="onPickFile('B', $event)" />
-              <button v-if="fileB" class="linkBtn" type="button" @click="clearPicked('B')">Quitar</button>
-            </div>
-            <div v-if="fileB" class="uploadName">{{ fileB.name }}</div>
-          </div>
-
-          <div class="uploadRow">
-            <div class="uploadLabel">Factura C</div>
-            <div class="uploadCtrl">
-              <input class="uploadInput" type="file" accept=".xlsx" @change="onPickFile('C', $event)" />
-              <button v-if="fileC" class="linkBtn" type="button" @click="clearPicked('C')">Quitar</button>
-            </div>
-            <div v-if="fileC" class="uploadName">{{ fileC.name }}</div>
-          </div>
-
-          <label class="chk">
-            <input type="checkbox" v-model="clearOtherFacturacion" />
-            Limpiar Facturacion.xlsx de los otros tipos antes de guardar
-          </label>
-          <p class="uploadHint">Se guardan en input/Factura A|B|C como Facturacion.xlsx.</p>
+          <button class="modalClose" type="button" aria-label="Cerrar" @click="goBack">
+            <svg class="modalCloseIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
 
+        <div class="modalBody">
+          <div class="field">
+            <div class="fieldHeader">
+              <div class="fieldLabel">CUIT/CUIL</div>
+            </div>
+            <div class="selectField">
+              <select class="selectControl" v-model.number="selectedCuit">
+                <option v-if="!cuitsList.length" :value="0" disabled>Selecciona un CUIT/CUIL</option>
+                <option v-for="u in cuitsList" :key="u.cuit" :value="u.cuit">
+                  {{ u.cuit }}{{ u.razon_social ? ' - ' + u.razon_social : '' }}
+                </option>
+              </select>
+              <div class="selectTrailing" aria-hidden="true">
+                <svg class="caretDown" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
 
-        <p v-if="modalError" class="modalError">{{ modalError }}</p>
+          <div class="field">
+            <div class="fieldHeader">
+              <div class="fieldLabelRow">
+                <div class="fieldLabel">Factura A</div>
+                <div class="req">*</div>
+              </div>
+            </div>
+            <div class="fileUpload">
+              <div class="fileContainer">
+                <div class="fileLeft">
+                  <input ref="inputAEl" class="fileInput" type="file" accept=".xlsx" @change="onPickFile('A', $event)" />
+                  <button class="fileBtn" type="button" @click="triggerPick('A')">Seleccionar archivo</button>
+
+                  <div class="fileNameWrap">
+                    <div class="fileName" :class="{ placeholder: !fileA }">
+                      {{ fileA ? fileA.name : 'Ningún archivo seleccionado' }}
+                    </div>
+                    <img v-if="fileA" class="checkIcon" :src="icons.checkCircle" alt="" />
+                  </div>
+                </div>
+
+                <button v-if="fileA" class="trashBtn" type="button" aria-label="Quitar archivo" @click="clearPickedUI('A')">
+                  <img class="trashIcon" :src="icons.trash" alt="" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="fieldHeader">
+              <div class="fieldLabelRow">
+                <div class="fieldLabel">Factura B</div>
+                <div class="req">*</div>
+              </div>
+            </div>
+            <div class="fileUpload">
+              <div class="fileContainer">
+                <div class="fileLeft">
+                  <input ref="inputBEl" class="fileInput" type="file" accept=".xlsx" @change="onPickFile('B', $event)" />
+                  <button class="fileBtn" type="button" @click="triggerPick('B')">Seleccionar archivo</button>
+
+                  <div class="fileNameWrap">
+                    <div class="fileName" :class="{ placeholder: !fileB }">
+                      {{ fileB ? fileB.name : 'Ningún archivo seleccionado' }}
+                    </div>
+                    <img v-if="fileB" class="checkIcon" :src="icons.checkCircle" alt="" />
+                  </div>
+                </div>
+
+                <button v-if="fileB" class="trashBtn" type="button" aria-label="Quitar archivo" @click="clearPickedUI('B')">
+                  <img class="trashIcon" :src="icons.trash" alt="" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="fieldHeader">
+              <div class="fieldLabelRow">
+                <div class="fieldLabel">Factura C</div>
+                <div class="req">*</div>
+              </div>
+            </div>
+            <div class="fileUpload">
+              <div class="fileContainer">
+                <div class="fileLeft">
+                  <input ref="inputCEl" class="fileInput" type="file" accept=".xlsx" @change="onPickFile('C', $event)" />
+                  <button class="fileBtn" type="button" @click="triggerPick('C')">Seleccionar archivo</button>
+
+                  <div class="fileNameWrap">
+                    <div class="fileName" :class="{ placeholder: !fileC }">
+                      {{ fileC ? fileC.name : 'Ningún archivo seleccionado' }}
+                    </div>
+                    <img v-if="fileC" class="checkIcon" :src="icons.checkCircle" alt="" />
+                  </div>
+                </div>
+
+                <button v-if="fileC" class="trashBtn" type="button" aria-label="Quitar archivo" @click="clearPickedUI('C')">
+                  <img class="trashIcon" :src="icons.trash" alt="" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <label class="checkboxRow">
+            <input class="checkbox" type="checkbox" v-model="clearOtherFacturacion" />
+            <span class="checkboxText">Limpiar Facturacion.xlsx de los otros tipos antes de guardar.</span>
+          </label>
+
+          <p v-if="modalError" class="modalError">{{ modalError }}</p>
+        </div>
 
         <div class="modalActions">
-          <button class="secondary" @click="goBack">Cancelar</button>
-          <button class="primary" :disabled="!selectedCuit || busy || confirming" @click="confirmCuitAndStart">
+          <button class="btnTertiary" type="button" @click="goBack">Cancelar</button>
+          <button class="btnPrimary" type="button" :disabled="!selectedCuit || busy || confirming" @click="confirmCuitAndStart">
             {{ startBtnText }}
           </button>
         </div>
       </div>
     </div>
 
-    <main class="main">
+<main class="main">
       <section class="container">
         <div class="headerRow">
           <button class="back" @click="goBack">
@@ -167,7 +244,11 @@ type ParsedResult = {
 type CuitItem = { cuit: number; razon_social: string }
 
 const router = useRouter()
-const icons = { union: new URL('@/assets/icons/Union.svg', import.meta.url).href }
+const icons = {
+  union: new URL('@/assets/icons/Union.svg', import.meta.url).href,
+  checkCircle: new URL('@/assets/icons/CheckCircle.svg', import.meta.url).href,
+  trash: new URL('@/assets/icons/Trash.svg', import.meta.url).href,
+}
 
 const { env } = useRuntimeEnv()
 
@@ -281,6 +362,10 @@ async function loadCuitsForModal(){
 }
 
 
+const inputAEl = ref<HTMLInputElement | null>(null)
+const inputBEl = ref<HTMLInputElement | null>(null)
+const inputCEl = ref<HTMLInputElement | null>(null)
+
 function isXlsx(file: File){
   return file.name.toLowerCase().endsWith('.xlsx')
 }
@@ -306,6 +391,17 @@ function clearPicked(tipo: 'A'|'B'|'C'){
   if (tipo === 'A') fileA.value = null
   if (tipo === 'B') fileB.value = null
   if (tipo === 'C') fileC.value = null
+}
+
+function triggerPick(tipo: 'A'|'B'|'C'){
+  const el = tipo === 'A' ? inputAEl.value : (tipo === 'B' ? inputBEl.value : inputCEl.value)
+  el?.click()
+}
+
+function clearPickedUI(tipo: 'A'|'B'|'C'){
+  clearPicked(tipo)
+  const el = tipo === 'A' ? inputAEl.value : (tipo === 'B' ? inputBEl.value : inputCEl.value)
+  if (el) el.value = ''
 }
 
 async function uploadFacturacion(cuit: number){
@@ -750,51 +846,206 @@ h3{margin:0;font-size:34px;letter-spacing:-1px;color:var(--text)}
   display:flex; align-items:center; justify-content:center;
   z-index:9999;
 }
-.modalCard{
-  width:min(540px, calc(100% - 32px));
-  background:var(--surface);
-  border:1px solid var(--border);
+.modalShell{
+  width:min(560px, calc(100% - 32px));
+  background:#fcfcfc;
   border-radius:16px;
-  padding:22px;
+  box-shadow:0 10px 25px rgba(0,0,0,.08);
 }
-.modalTitle{margin:0;color:var(--text);font-size:20px}
-.modalSubtitle{margin:8px 0 16px 0;color:var(--muted);font-size:14px;line-height:20px}
-.modalLabel{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-.modalSelect{
+.modalHeader{
   width:100%;
-  border:1px solid var(--border);
-  background:var(--surface);
-  border-radius:10px;
-  padding:10px 12px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:24px 24px 0;
+  box-sizing:border-box;
+  gap:16px;
+}
+.modalHeaderText{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.modalTitleRow{width:100%;display:flex;align-items:center;gap:12px}
+.modalTitle{flex:1;margin:0;font-size:24px;line-height:32px;font-weight:600;color:#242628}
+.modalSubtitle{margin:0;font-size:16px;line-height:24px;color:#686e75}
+.modalClose{
+  height:40px;width:40px;
+  border-radius:8px;
+  border:none;
+  background:transparent;
+  color:#242628;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px;
+  cursor:pointer;
+}
+.modalClose:hover{background:#f4f5f5}
+.modalCloseIcon{width:24px;height:24px}
+
+.modalBody{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  padding:24px;
+  box-sizing:border-box;
+  gap:16px;
+  font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-.uploadBlock{margin-top:14px;padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff}
-.uploadTitle{font-weight:900;color:var(--text);font-size:13px;margin-bottom:10px}
-.uploadRow{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;margin-bottom:10px}
-.uploadLabel{font-size:12px;font-weight:800;color:var(--muted)}
-.uploadCtrl{display:flex;gap:10px;align-items:center}
-.uploadInput{flex:1;min-width:0}
-.uploadName{grid-column:2; font-size:12px;color:var(--text);opacity:.9}
-.uploadHint{margin:8px 0 0 0;font-size:12px;color:var(--muted)}
-.chk{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
-.modalActions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px}
-.modalError{margin-top:10px;color:#b42318;font-weight:600;font-size:12px}
-.primary{
-  background:var(--blue); color:#fff; border:none;
-  border-radius:10px; padding:10px 14px; cursor:pointer;
-  font-weight:800;
+.field{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.fieldHeader{width:100%;display:flex;align-items:center}
+.fieldLabel{font-size:14px;line-height:22px;font-weight:600;color:#242628}
+.fieldLabelRow{display:flex;align-items:center;gap:4px}
+.req{font-size:14px;line-height:22px;font-weight:600;color:#f80004}
+
+.selectField{
+  width:100%;
+  height:40px;
+  border-radius:8px;
+  background:#f4f5f5;
+  border:1px solid #ced1d3;
+  display:flex;
+  align-items:center;
+  padding:4px 8px 4px 12px;
+  box-sizing:border-box;
+  gap:8px;
 }
-.primary:disabled{opacity:.6; cursor:not-allowed}
+.selectControl{
+  flex:1;
+  height:32px;
+  border:none;
+  outline:none;
+  background:transparent;
+  font-size:14px;
+  line-height:24px;
+  color:#242628;
+  text-align:left;
+  appearance:none;
+}
+.selectTrailing{height:32px;width:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;color:#686e75}
+.caretDown{width:20px;height:20px}
+
+.fileUpload{width:100%}
+.fileContainer{
+  width:100%;
+  border-radius:8px;
+  background:#f4f5f5;
+  border:1px dashed #ced1d3;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px;
+  box-sizing:border-box;
+  gap:20px;
+}
+.fileLeft{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
+.fileInput{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.fileBtn{
+  border-radius:8px;
+  background:#fcfcfc;
+  border:1px solid #0034c2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:8px 16px;
+  cursor:pointer;
+  font-size:16px;
+  line-height:24px;
+  font-weight:600;
+  color:#0034c2;
+  white-space:nowrap;
+}
+.fileBtn:active{transform:translateY(1px)}
+.fileNameWrap{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.fileName{font-size:16px;line-height:24px;color:#242628;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.fileName.placeholder{color:#686e75}
+.checkIcon{width:24px;height:24px;flex:0 0 auto}
+.iconBtn{
+  height:40px;width:40px;
+  border-radius:8px;
+  border:none;
+  background:transparent;
+  color:#686e75;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px;
+  cursor:pointer;
+}
+.iconBtn:hover{background:#fcfcfc}
+
+.trashBtn{
+  width:20px;
+  height:20px;
+  padding:0;
+  border:none;
+  background:transparent;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.trashIcon{
+  width:20px;
+  height:20px;
+  display:block;
+}
+
+.checkboxRow{display:flex;align-items:center;gap:8px}
+.checkbox{height:18px;width:18px;border-radius:4px}
+.checkboxText{font-size:16px;line-height:24px;color:#000}
+
+.modalActions{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding:0 24px 24px;
+  box-sizing:border-box;
+  gap:8px;
+}
+.btnTertiary{
+  border-radius:8px;
+  background:#fcfcfc;
+  border:1px solid #ced1d3;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:12px 24px;
+  cursor:pointer;
+  font-size:16px;
+  line-height:24px;
+  font-weight:600;
+  color:#242628;
+}
+.btnPrimary{
+  border-radius:8px;
+  background:#0034c2;
+  border:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:12px 24px;
+  cursor:pointer;
+  font-size:16px;
+  line-height:24px;
+  font-weight:600;
+  color:#fcfcfc;
+}
+.btnPrimary:disabled{opacity:.6;cursor:not-allowed}
+
+.modalError{width:100%;color:#b42318;font-weight:600;font-size:12px;line-height:18px}
 
 .envBadge{
   display:inline-flex;
-  margin-left:10px;
   font-weight:900;
   font-size:12px;
   padding:4px 8px;
   border-radius:999px;
-  border:1px solid var(--border);
+  border:1px solid #ced1d3;
   background:#fff;
+  white-space:nowrap;
 }
 .envBadge.demo{color:var(--blue)}
 .envBadge.prod{color:#0f7a2f}
