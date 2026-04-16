@@ -980,6 +980,9 @@ onMounted(loadCuits)
 
 .inlineField {
   margin-top: 6px;
+  width: 100%;
+  max-width: 420px;
+  min-width: 0;
 }
 
 .hintSmall {
@@ -1098,11 +1101,8 @@ code {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  text-align: left;
-  font-size: 14px;
-  color: #242628;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  gap: 8px;
+  min-width: 0;
 }
 
 .fgHeader {
@@ -1165,6 +1165,8 @@ code {
   flex: 1;
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .fgContent {
@@ -1172,6 +1174,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .fgText {

@@ -278,7 +278,7 @@ const confirming = ref(false)
 const fileA = ref<File | null>(null)
 const fileB = ref<File | null>(null)
 const fileC = ref<File | null>(null)
-const clearOtherFacturacion = ref(true)
+const clearOtherFacturacion = ref(false)
 
 const hasAnyFile = computed(() => !!(fileA.value || fileB.value || fileC.value))
 const startBtnText = computed(() => {
@@ -552,7 +552,7 @@ async function startJob(cuit: number){
   currentPrint.value = 'Preparando la ejecución...'
 
   try{
-    const { data } = await http.post('/jobs/generar', {
+    const { data } = await http.post('/api/jobs/generar', {
       mode: 'local',
       cuit,
       environment: env.value, // 'demo' | 'prod'
