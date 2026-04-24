@@ -552,7 +552,7 @@ async function startJob(cuit: number){
   currentPrint.value = 'Preparando la ejecución...'
 
   try{
-    const { data } = await http.post('/jobs/generar', {
+    const { data } = await http.post('/api/jobs/generar', {
       mode: 'local',
       cuit,
       environment: env.value, // 'demo' | 'prod'

@@ -126,6 +126,30 @@
           </div>
 
           <div class="kv">
+            <div class="k">Ingresos Brutos</div>
+            <div class="v">
+              <input
+                v-model="ingresosBrutosInput"
+                class="fgInput"
+                type="text"
+                placeholder="Ingresos Brutos"
+              />
+            </div>
+          </div>
+
+          <div class="kv">
+            <div class="k">Fecha de Inicio de Actividades</div>
+            <div class="v">
+              <input
+                v-model="fechaInicioActividadesInput"
+                class="fgInput"
+                type="text"
+                placeholder="dd/mm/aaaa"
+              />
+            </div>
+          </div>
+
+          <div class="kv">
             <div class="k">Punto de venta</div>
             <div class="v">
               <span v-if="!pvOptions.length">—</span>
@@ -375,6 +399,8 @@ type Detail = {
   razon_social?: string
   domicilio_comercial?: string
   condicion_iva?: string
+  ingresos_brutos?: string
+  fecha_inicio_actividades?: string
   puntos_venta?: any[]
   actividades?: any[]
   actividades_detalle?: any[]
@@ -403,6 +429,8 @@ const pvOptions = ref<Opt[]>([])
 const actOptions = ref<Opt[]>([])
 const selectedPuntoVenta = ref<number | null>(null)
 const selectedActividad = ref<number | null>(0)
+const ingresosBrutosInput = ref('')
+const fechaInicioActividadesInput = ref('')
 
 const syncMsg = ref('')
 const syncErr = ref('')
@@ -621,6 +649,8 @@ async function loadDetail() {
   try {
     const { data } = await http.get(`/api/config/cuits/${selectedCuit.value}`)
     detail.value = data as Detail
+    ingresosBrutosInput.value = detail.value?.ingresos_brutos || ''
+    fechaInicioActividadesInput.value = detail.value?.fecha_inicio_actividades || ''
 
     pvOptions.value = buildPvOptions(detail.value?.puntos_venta || [])
     actOptions.value = buildActOptions((detail.value as any)?.actividades_detalle, detail.value?.actividades || [])
@@ -638,6 +668,8 @@ async function loadDetail() {
     actOptions.value = []
     selectedPuntoVenta.value = null
     selectedActividad.value = null
+    ingresosBrutosInput.value = ''
+    fechaInicioActividadesInput.value = ''
     errorMsg.value = e?.response?.data?.detail || e?.message || 'No se pudo cargar el detalle del CUIT.'
   } finally {
     loading.value = false
@@ -649,11 +681,17 @@ async function syncExcel() {
   syncMsg.value = ''
   syncErr.value = ''
   try {
+    const ingresosBrutos = ingresosBrutosInput.value.trim() || null
+    const fechaInicioActividades = fechaInicioActividadesInput.value.trim() || null
+
     await http.post(`/api/config/cuits/${selectedCuit.value}/sync-excel`, {
       punto_venta: selectedPuntoVenta.value,
       numero_actividad: selectedActividad.value,
+      ingresos_brutos: ingresosBrutos,
+      inicio_actividades: fechaInicioActividades,
       force_pv_actividad: true,
     })
+
     syncMsg.value = 'Configuración guardada en Config.xlsx (FacturaA/B/C).'
   } catch (e: any) {
     syncErr.value = e?.response?.data?.detail || e?.message || 'No se pudo sincronizar Config.xlsx.'
@@ -980,6 +1018,9 @@ onMounted(loadCuits)
 
 .inlineField {
   margin-top: 6px;
+  width: 100%;
+  max-width: 420px;
+  min-width: 0;
 }
 
 .hintSmall {
@@ -1098,11 +1139,8 @@ code {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  text-align: left;
-  font-size: 14px;
-  color: #242628;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  gap: 8px;
+  min-width: 0;
 }
 
 .fgHeader {
@@ -1165,6 +1203,8 @@ code {
   flex: 1;
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .fgContent {
@@ -1172,6 +1212,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .fgText {
